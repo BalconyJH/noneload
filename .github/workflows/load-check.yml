@@ -1,0 +1,130 @@
+name: NoneBot Plugin Load Check
+
+on:
+  workflow_call:
+    inputs:
+      python-versions:
+        description: JSON array of Python versions to test.
+        required: false
+        type: string
+        default: '["3.12"]'
+      module-name:
+        description: Plugin module import path.
+        required: false
+        type: string
+        default: ""
+      project-link:
+        description: Distribution name from pyproject.toml.
+        required: false
+        type: string
+        default: ""
+      package:
+        description: Local package spec passed to uv pip install.
+        required: false
+        type: string
+        default: "."
+      working-directory:
+        description: Repository subdirectory containing the plugin project.
+        required: false
+        type: string
+        default: "."
+      uv-version:
+        description: Version passed to astral-sh/setup-uv.
+        required: false
+        type: string
+        default: ""
+      uv-cache:
+        description: Whether to enable the setup-uv cache.
+        required: false
+        type: string
+        default: "true"
+      editable:
+        description: Install local package specs in editable mode.
+        required: false
+        type: boolean
+        default: true
+      install-extra-args:
+        description: Extra arguments passed to uv pip install.
+        required: false
+        type: string
+        default: ""
+      install-command:
+        description: Custom package installation command.
+        required: false
+        type: string
+        default: ""
+      plugin-config:
+        description: Inline .env.prod content used while loading the plugin.
+        required: false
+        type: string
+        default: ""
+      plugin-config-file:
+        description: File appended to .env.prod while loading the plugin.
+        required: false
+        type: string
+        default: ""
+      registry-url:
+        description: NoneBot plugin registry URL.
+        required: false
+        type: string
+        default: https://raw.githubusercontent.com/nonebot/registry/results/plugins.json
+      load-dependencies:
+        description: Require detected dependent NoneBot plugins.
+        required: false
+        type: boolean
+        default: true
+      check-optional-dependencies:
+        description: Install every optional dependency group declared in pyproject.toml before loading.
+        required: false
+        type: boolean
+        default: false
+      timeout:
+        description: Timeout in seconds for each install and load command.
+        required: false
+        type: number
+        default: 600
+      fail-on-error:
+        description: Fail each matrix job when the plugin cannot be loaded.
+        required: false
+        type: boolean
+        default: true
+      summary:
+        description: Write a GitHub Step Summary for each matrix job.
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      PLUGIN_CONFIG:
+        description: Secret .env.prod content. Takes precedence over the plugin-config input.
+        required: false
+
+jobs:
+  load-check:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ${{ fromJSON(inputs.python-versions) }}
+    steps:
+      - uses: actions/checkout@v7.0.0
+      - uses: BalconyJH/noneload@v1
+        with:
+          module-name: ${{ inputs.module-name }}
+          project-link: ${{ inputs.project-link }}
+          package: ${{ inputs.package }}
+          working-directory: ${{ inputs.working-directory }}
+          python-version: ${{ matrix.python-version }}
+          uv-version: ${{ inputs.uv-version }}
+          uv-cache: ${{ inputs.uv-cache }}
+          editable: ${{ inputs.editable }}
+          install-extra-args: ${{ inputs.install-extra-args }}
+          install-command: ${{ inputs.install-command }}
+          plugin-config: ${{ secrets.PLUGIN_CONFIG || inputs.plugin-config }}
+          plugin-config-file: ${{ inputs.plugin-config-file }}
+          registry-url: ${{ inputs.registry-url }}
+          load-dependencies: ${{ inputs.load-dependencies }}
+          check-optional-dependencies: ${{ inputs.check-optional-dependencies }}
+          timeout: ${{ inputs.timeout }}
+          fail-on-error: ${{ inputs.fail-on-error }}
+          summary: ${{ inputs.summary }}

@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.0
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          python-version: "3.12"
+      - name: Run unit tests
+        run: uv run --no-project --managed-python --python 3.12 python3 -m unittest discover -s tests -v
+      - name: Update major version tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [[ "$RELEASE_TAG" =~ ^v([0-9]+)\.[0-9]+\.[0-9]+$ ]]; then
+            major_tag="v${BASH_REMATCH[1]}"
+          else
+            echo "Expected a semantic version tag, received: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git tag --force "$major_tag" "$RELEASE_TAG"
+          git push origin "refs/tags/$major_tag" --force
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" --verify-tag --generate-notes

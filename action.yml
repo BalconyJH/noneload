@@ -1,0 +1,139 @@
+name: NoneBot Plugin Load Check
+description: Install a NoneBot plugin in an isolated uv environment and verify that nonebot.load_plugin() succeeds.
+
+author: Tacrolimus
+
+inputs:
+  module-name:
+    description: Plugin module import path, for example nonebot_plugin_foo. If omitted, the action tries to detect it.
+    required: false
+    default: ""
+  project-link:
+    description: Distribution project name, for example nonebot-plugin-foo. If omitted, the action reads [project].name from pyproject.toml.
+    required: false
+    default: ""
+  package:
+    description: Local package spec passed to uv pip install when install-command is not set. Use . for the current project.
+    required: false
+    default: "."
+  working-directory:
+    description: Repository subdirectory containing the plugin project.
+    required: false
+    default: "."
+  python-version:
+    description: Python version installed and used by uv.
+    required: false
+    default: "3.12"
+  uv-version:
+    description: uv version installed by astral-sh/setup-uv. Empty means setup-uv resolves the version from uv.toml/pyproject.toml or installs the latest uv.
+    required: false
+    default: ""
+  uv-cache:
+    description: Enable astral-sh/setup-uv cache. Use true, false, or auto.
+    required: false
+    default: "true"
+  editable:
+    description: Install local package specs in editable mode when install-command is not set.
+    required: false
+    default: "true"
+  install-extra-args:
+    description: Extra arguments appended to uv pip install, for example --extra-index-url URL.
+    required: false
+    default: ""
+  install-command:
+    description: Custom install command. It runs with the uv-created venv at the front of PATH. Overrides package/editable/install-extra-args.
+    required: false
+    default: ""
+  plugin-config:
+    description: Inline .env.prod content used while loading the plugin.
+    required: false
+    default: ""
+  plugin-config-file:
+    description: Path to a file whose content is appended to .env.prod, relative to working-directory unless absolute.
+    required: false
+    default: ""
+  registry-url:
+    description: URL of NoneBot registry plugins.json, used to map plugin package dependencies to module names.
+    required: false
+    default: https://raw.githubusercontent.com/nonebot/registry/results/plugins.json
+  load-dependencies:
+    description: Require installed dependent NoneBot plugins detected from registry before finishing the check.
+    required: false
+    default: "true"
+  check-optional-dependencies:
+    description: Install every optional dependency group declared in pyproject.toml and include its installed NoneBot plugin dependencies in the load check. Requires the default uv pip install flow.
+    required: false
+    default: "false"
+  timeout:
+    description: Timeout in seconds for Python installation, package installation, and plugin loading commands.
+    required: false
+    default: "600"
+  fail-on-error:
+    description: Fail this action when plugin loading fails.
+    required: false
+    default: "true"
+  summary:
+    description: Write a GitHub Step Summary.
+    required: false
+    default: "true"
+
+outputs:
+  load:
+    description: Whether the plugin loaded successfully.
+    value: ${{ steps.check.outputs.load }}
+  run:
+    description: Whether the isolated test runner was executed after installation.
+    value: ${{ steps.check.outputs.run }}
+  version:
+    description: Installed plugin distribution version, if detected.
+    value: ${{ steps.check.outputs.version }}
+  metadata:
+    description: Plugin metadata as compact JSON, if detected.
+    value: ${{ steps.check.outputs.metadata }}
+  result-file:
+    description: Absolute path to the JSON result file.
+    value: ${{ steps.check.outputs.result-file }}
+  test-env:
+    description: Resolved test environment, for example python==3.12.8 nonebot2==2.4.0 pydantic==2.10.0.
+    value: ${{ steps.check.outputs.test-env }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v8.3.2
+      with:
+        version: ${{ inputs.uv-version }}
+        python-version: ${{ inputs.python-version }}
+        working-directory: ${{ inputs.working-directory }}
+        enable-cache: ${{ inputs.uv-cache }}
+        cache-dependency-glob: |
+          **/*requirements*.txt
+          **/*requirements*.in
+          **/*constraints*.txt
+          **/*constraints*.in
+          **/pyproject.toml
+          **/uv.lock
+          **/*.py.lock
+
+    - name: Check plugin load
+      id: check
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_MODULE_NAME: ${{ inputs.module-name }}
+        INPUT_PROJECT_LINK: ${{ inputs.project-link }}
+        INPUT_PACKAGE: ${{ inputs.package }}
+        INPUT_PYTHON_VERSION: ${{ inputs.python-version }}
+        INPUT_EDITABLE: ${{ inputs.editable }}
+        INPUT_INSTALL_EXTRA_ARGS: ${{ inputs.install-extra-args }}
+        INPUT_INSTALL_COMMAND: ${{ inputs.install-command }}
+        INPUT_PLUGIN_CONFIG: ${{ inputs.plugin-config }}
+        INPUT_PLUGIN_CONFIG_FILE: ${{ inputs.plugin-config-file }}
+        INPUT_REGISTRY_URL: ${{ inputs.registry-url }}
+        INPUT_LOAD_DEPENDENCIES: ${{ inputs.load-dependencies }}
+        INPUT_CHECK_OPTIONAL_DEPENDENCIES: ${{ inputs.check-optional-dependencies }}
+        INPUT_TIMEOUT: ${{ inputs.timeout }}
+        INPUT_FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+        INPUT_SUMMARY: ${{ inputs.summary }}
+      run: uv run --no-project --managed-python --python "$INPUT_PYTHON_VERSION" python "$GITHUB_ACTION_PATH/src/check_load.py"
