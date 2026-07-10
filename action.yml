@@ -3,6 +3,10 @@ description: Install a NoneBot plugin in an isolated uv environment and verify t
 
 author: Tacrolimus
 
+branding:
+  icon: check-circle
+  color: green
+
 inputs:
   module-name:
     description: Plugin module import path, for example nonebot_plugin_foo. If omitted, the action tries to detect it.
